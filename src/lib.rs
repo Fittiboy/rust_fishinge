@@ -182,7 +182,7 @@ pub async fn create_subscription(
         },
     };
 
-    let res = client
+    let _ = client
         .post("https://api.twitch.tv/helix/eventsub/subscriptions")
         .header("Authorization", format!("Bearer {}", token.trim()))
         .header("Client-Id", client_id.trim())
