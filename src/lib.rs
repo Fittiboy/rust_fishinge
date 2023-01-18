@@ -59,9 +59,9 @@ struct RewardData {
 }
 
 pub async fn get_reward_id() -> Result<String, Box<dyn std::error::Error>> {
-    let streamer = read_to_string("./streamer.txt").unwrap();
-    let token = read_to_string("./fitti_uat.txt").unwrap();
-    let client_id = read_to_string("./client_id.txt").unwrap();
+    let streamer = read_to_string("./streamer.txt").expect("needs to have streamer.txt present");
+    let token = read_to_string("./uat.txt").expect("needs to have uat.txt present");
+    let client_id = read_to_string("./client_id.txt").expect("needs to have client_id.txt present");
     let client = reqwest::Client::new();
     let res: BroadcasterResponse = client
         .get(format!(
