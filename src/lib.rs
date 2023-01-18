@@ -305,9 +305,9 @@ pub async fn update_command() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("Enabled command!");
-    println!("Waiting 20 seconds");
+    println!("Waiting 15 seconds");
 
-    sleep(Duration::from_secs(20));
+    sleep(Duration::from_secs(15));
     // sleep(Duration::from_secs(300));
 
     command.enabledOnline = false;
