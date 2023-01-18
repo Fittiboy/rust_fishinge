@@ -207,7 +207,7 @@ struct AccessResponse {
     role: String,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default)]
 #[allow(dead_code, non_snake_case)]
 struct CommandResponse {
     cooldown: Cooldown,
@@ -229,7 +229,7 @@ struct CommandResponse {
     updatedAt: String,
 }
 
-#[derive(Deserialize, Debug, Default)]
+#[derive(Deserialize, Serialize, Debug, Default)]
 #[allow(dead_code)]
 struct Cooldown {
     user: i32,
@@ -288,10 +288,45 @@ pub async fn update_command() -> Result<(), Box<dyn std::error::Error>> {
         return Err("command not found".into());
     }
 
-    println!("Found command: {:#?}", command);
+    command.enabledOnline = true;
+
+    let mut command = client
+        .put(url_base.to_string() + &format!("bot/commands/{}/{}", channel_id, command._id))
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .header("Authorization", format!("Bearer {}", token.trim()))
+        .json(&command)
+        .send()
+        .await?
+        .json::<CommandResponse>()
+        .await?;
+
+    if command.command.len() == 0 {
+        return Err("command not enabled correctly".into());
+    }
+
+    println!("Enabled command!");
 
     sleep(Duration::from_secs(30));
     // sleep(Duration::from_secs(300));
-    println!("Enough sleep!");
+
+    command.enabledOnline = false;
+
+    let command = client
+        .put(url_base.to_string() + &format!("bot/commands/{}/{}", channel_id, command._id))
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .header("Authorization", format!("Bearer {}", token.trim()))
+        .json(&command)
+        .send()
+        .await?
+        .json::<CommandResponse>()
+        .await?;
+
+    if command.command.len() == 0 {
+        return Err("command not disabled correctly".into());
+    }
+
+    println!("Disabled command!");
     Ok(())
 }
