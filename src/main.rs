@@ -3,7 +3,10 @@ use eventsub_websocket::{event_handler, get_session};
 use std::sync::mpsc;
 use std::thread;
 
-fn main() -> Result<(), String> {
+use fishinge::get_reward_id;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (tx, rx) = mpsc::channel();
     let mut session = get_session(None)?;
     let _ = thread::Builder::new()
@@ -20,7 +23,7 @@ fn main() -> Result<(), String> {
             TwitchMessage::Welcome(_) => {
                 welcome_count += 1;
                 if welcome_count == 1 {
-                    subscribe();
+                    subscribe().await?;
                 }
             }
             _ => {}
@@ -32,6 +35,8 @@ fn handle_notification() {
     println!("Doing the pond thing!");
 }
 
-fn subscribe() {
-    println!("Subscribing!");
+async fn subscribe() -> Result<(), Box<dyn std::error::Error>> {
+    let reward_id = get_reward_id().await?;
+    println!("Got reward id: {}", reward_id);
+    Ok(())
 }
