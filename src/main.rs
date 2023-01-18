@@ -3,7 +3,7 @@ use eventsub_websocket::{event_handler, get_session};
 use std::sync::mpsc;
 use std::thread;
 
-use fishinge::get_reward_id;
+use fishinge::{create_subscription, get_ids};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -20,10 +20,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let msg: TwitchMessage = rx.recv().map_err(|err| format!("{}", err))?;
         match msg {
             TwitchMessage::Notification(_) => handle_notification(),
-            TwitchMessage::Welcome(_) => {
+            TwitchMessage::Welcome(msg) => {
                 welcome_count += 1;
                 if welcome_count == 1 {
-                    subscribe().await?;
+                    let session_id = msg.session_id().to_owned();
+                    subscribe(session_id).await?;
+                    println!("Subscribed!");
                 }
             }
             _ => {}
@@ -32,11 +34,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn handle_notification() {
-    println!("Doing the pond thing!");
+    println!("Notification received!!");
 }
 
-async fn subscribe() -> Result<(), Box<dyn std::error::Error>> {
-    let reward_id = get_reward_id().await?;
-    println!("Got reward id: {}", reward_id);
+async fn subscribe(session_id: String) -> Result<(), Box<dyn std::error::Error>> {
+    let (broadcaster_id, reward_id) = get_ids().await?;
+    println!(
+        "Got ids:\n\tBroadcaster: {},\n\tReward: {}",
+        broadcaster_id, reward_id
+    );
+    create_subscription(session_id, broadcaster_id, reward_id).await?;
     Ok(())
 }

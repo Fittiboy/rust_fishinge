@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{Map, Number, Value};
 use std::collections::HashMap;
 use std::fs::read_to_string;
@@ -58,10 +58,12 @@ struct RewardData {
     cooldown_expires_at: Option<String>,
 }
 
-pub async fn get_reward_id() -> Result<String, Box<dyn std::error::Error>> {
+pub async fn get_ids() -> Result<(String, String), Box<dyn std::error::Error>> {
     let streamer = read_to_string("./streamer.txt").expect("needs to have streamer.txt present");
     let token = read_to_string("./uat.txt").expect("needs to have uat.txt present");
     let client_id = read_to_string("./client_id.txt").expect("needs to have client_id.txt present");
+    let reward_title =
+        read_to_string("./reward_title.txt").expect("needs to have reward_title.txt present");
     let client = reqwest::Client::new();
     let res: BroadcasterResponse = client
         .get(format!(
@@ -99,7 +101,7 @@ pub async fn get_reward_id() -> Result<String, Box<dyn std::error::Error>> {
 
     let mut reward_id = String::new();
     for reward in res.data {
-        if reward.title == "Highlight My Message (but without a message)" {
+        if reward.title == reward_title.trim() {
             reward_id = reward.id;
             break;
         }
@@ -109,5 +111,86 @@ pub async fn get_reward_id() -> Result<String, Box<dyn std::error::Error>> {
         return Err("reward not found".into());
     };
 
-    Ok(reward_id)
+    Ok((broadcaster_id, reward_id))
+}
+
+#[derive(Serialize, Debug)]
+#[allow(dead_code)]
+struct RequestBody {
+    r#type: String,
+    version: String,
+    condition: RewardCondition,
+    transport: Transport,
+}
+
+#[derive(Serialize, Debug)]
+#[allow(dead_code)]
+struct RewardCondition {
+    broadcaster_user_id: String,
+    reward_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+#[allow(dead_code)]
+struct Transport {
+    method: String,
+    session_id: String,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+struct SubscriptionResponse {
+    data: Vec<SubscriptionData>,
+    total: Number,
+    total_cost: Number,
+    max_total_cost: Number,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+struct SubscriptionData {
+    id: String,
+    status: String,
+    r#type: String,
+    version: String,
+    condition: Value,
+    created_at: String,
+    transport: Transport,
+    cost: Number,
+}
+
+pub async fn create_subscription(
+    session_id: String,
+    broadcaster_id: String,
+    reward_id: String,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let client = reqwest::Client::new();
+    let token = read_to_string("./uat.txt").expect("needs to have uat.txt present");
+    let client_id = read_to_string("./client_id.txt").expect("needs to have client_id.txt present");
+    let request_body = RequestBody {
+        r#type: "channel.channel_points_custom_reward_redemption.add".into(),
+        version: "1".into(),
+        condition: RewardCondition {
+            broadcaster_user_id: broadcaster_id,
+            reward_id,
+        },
+        transport: Transport {
+            method: "websocket".into(),
+            session_id,
+        },
+    };
+
+    let res = client
+        .post("https://api.twitch.tv/helix/eventsub/subscriptions")
+        .header("Authorization", format!("Bearer {}", token.trim()))
+        .header("Client-Id", client_id.trim())
+        .header("Content-Type", "application/json")
+        .json(&request_body)
+        .send()
+        .await?
+        .json::<SubscriptionResponse>()
+        .await?;
+
+    println!("{:#?}", res);
+    Ok(())
 }
