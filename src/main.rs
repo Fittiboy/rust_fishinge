@@ -13,7 +13,25 @@ fn main() -> Result<(), String> {
             Ok(())
         });
     loop {
+        let mut welcome_count = 0;
         let msg: TwitchMessage = rx.recv().map_err(|err| format!("{}", err))?;
-        println!("Handling message locally: {:#?}", msg);
+        match msg {
+            TwitchMessage::Notification(_) => handle_notification(),
+            TwitchMessage::Welcome(_) => {
+                welcome_count += 1;
+                if welcome_count == 1 {
+                    subscribe();
+                }
+            }
+            _ => {}
+        }
     }
+}
+
+fn handle_notification() {
+    {}
+}
+
+fn subscribe() {
+    println!("Subscribing!")
 }
