@@ -44,7 +44,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn handle_notification() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Time for a little nap!");
     fishinge::update_command().await?;
     Ok(())
 }
