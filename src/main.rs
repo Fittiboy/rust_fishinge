@@ -29,9 +29,9 @@ fn main() -> Result<(), String> {
 }
 
 fn handle_notification() {
-    {}
+    println!("Doing the pond thing!");
 }
 
 fn subscribe() {
-    println!("Subscribing!")
+    println!("Subscribing!");
 }
