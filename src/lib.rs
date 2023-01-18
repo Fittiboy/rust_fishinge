@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Number, Value};
 use std::collections::HashMap;
 use std::fs::read_to_string;
+use std::thread::sleep;
+use std::time::Duration;
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
@@ -192,5 +194,104 @@ pub async fn create_subscription(
         .await?;
 
     println!("{:#?}", res);
+    Ok(())
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(dead_code, non_snake_case)]
+struct AccessResponse {
+    channelId: String,
+    username: String,
+    avatar: String,
+    provider: String,
+    role: String,
+}
+
+#[derive(Deserialize, Debug, Default)]
+#[allow(dead_code, non_snake_case)]
+struct CommandResponse {
+    cooldown: Cooldown,
+    aliases: Vec<String>,
+    keywords: Vec<String>,
+    enabled: bool,
+    enabledOnline: bool,
+    enabledOffline: bool,
+    hidden: bool,
+    cost: i32,
+    r#type: String,
+    accessLevel: i32,
+    _id: String,
+    regex: Option<String>,
+    reply: String,
+    command: String,
+    channel: String,
+    createdAt: String,
+    updatedAt: String,
+}
+
+#[derive(Deserialize, Debug, Default)]
+#[allow(dead_code)]
+struct Cooldown {
+    user: i32,
+    global: i32,
+}
+
+pub async fn update_command() -> Result<(), Box<dyn std::error::Error>> {
+    let token = read_to_string("./jwt.txt").expect("jwt.txt needed");
+    let streamer =
+        read_to_string("./other_streamer.txt").expect("needs to have other_streamer.txt present");
+    let command_name =
+        read_to_string("./command_name.txt").expect("needs to have command_name.txt present");
+    let url_base = "https://api.streamelements.com/kappa/v2/";
+    let client = reqwest::Client::new();
+    let res = client
+        .get(url_base.to_string() + "users/access")
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .header("Authorization", format!("Bearer {}", token.trim()))
+        .send()
+        .await?
+        .json::<Vec<AccessResponse>>()
+        .await?;
+
+    let mut channel_id = String::new();
+    for res in res {
+        if res.username == streamer.trim() {
+            channel_id = res.channelId;
+            break;
+        }
+    }
+
+    if channel_id.len() == 0 {
+        return Err("channel_id not found".into());
+    };
+
+    let res = client
+        .get(url_base.to_string() + &format!("bot/commands/{}", channel_id))
+        .header("Content-Type", "application/json")
+        .header("Accept", "application/json")
+        .header("Authorization", format!("Bearer {}", token.trim()))
+        .send()
+        .await?
+        .json::<Vec<CommandResponse>>()
+        .await?;
+
+    let mut command = CommandResponse::default();
+    for res in res {
+        if res.command == command_name.trim() {
+            command = res;
+            break;
+        }
+    }
+
+    if command.command.len() == 0 {
+        return Err("command not found".into());
+    }
+
+    println!("Found command: {:#?}", command);
+
+    sleep(Duration::from_secs(30));
+    // sleep(Duration::from_secs(300));
+    println!("Enough sleep!");
     Ok(())
 }
