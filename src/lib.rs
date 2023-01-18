@@ -193,7 +193,6 @@ pub async fn create_subscription(
         .json::<SubscriptionResponse>()
         .await?;
 
-    println!("{:#?}", res);
     Ok(())
 }
 
