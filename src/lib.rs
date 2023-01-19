@@ -5,6 +5,51 @@ use std::fs::read_to_string;
 use std::thread::sleep;
 use std::time::Duration;
 
+#[derive(Deserialize, Debug, Clone)]
+pub struct Config {
+    client_id: String,
+    streamer: String,
+    user_access_token: String,
+    reward_title: String,
+    jwt: String,
+    command_name: String,
+}
+
+impl Config {
+    pub fn load() -> Config {
+        let mut config_file = dirs::config_dir().expect("there should always be a config dir");
+        config_file.push("fishinge");
+        config_file.push("fishinge.conf");
+        let config_data = read_to_string(config_file).unwrap();
+        let config: Config = toml::from_str(&config_data).unwrap();
+        config
+    }
+
+    pub fn client_id(&self) -> &str {
+        &self.client_id
+    }
+
+    pub fn streamer(&self) -> &str {
+        &self.streamer
+    }
+
+    pub fn user_access_token(&self) -> &str {
+        &self.user_access_token
+    }
+
+    pub fn reward_title(&self) -> &str {
+        &self.reward_title
+    }
+
+    pub fn jwt(&self) -> &str {
+        &self.jwt
+    }
+
+    pub fn command_name(&self) -> &str {
+        &self.command_name
+    }
+}
+
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
 struct BroadcasterResponse {
@@ -60,20 +105,18 @@ struct RewardData {
     cooldown_expires_at: Option<String>,
 }
 
-pub async fn get_ids() -> Result<(String, String), Box<dyn std::error::Error>> {
-    let streamer = read_to_string("./streamer.txt").expect("needs to have streamer.txt present");
-    let token = read_to_string("./uat.txt").expect("needs to have uat.txt present");
-    let client_id = read_to_string("./client_id.txt").expect("needs to have client_id.txt present");
-    let reward_title =
-        read_to_string("./reward_title.txt").expect("needs to have reward_title.txt present");
+pub async fn get_ids(config: &Config) -> Result<(String, String), Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
     let res: BroadcasterResponse = client
         .get(format!(
             "https://api.twitch.tv/helix/search/channels?query={}",
-            streamer.trim()
+            config.streamer()
         ))
-        .header("Authorization", format!("Bearer {}", token.trim()))
-        .header("Client-Id", client_id.trim())
+        .header(
+            "Authorization",
+            format!("Bearer {}", config.user_access_token()),
+        )
+        .header("Client-Id", config.client_id())
         .send()
         .await?
         .json::<BroadcasterResponse>()
@@ -81,7 +124,7 @@ pub async fn get_ids() -> Result<(String, String), Box<dyn std::error::Error>> {
 
     let mut broadcaster_id: String = String::new();
     for broadcaster in res.data {
-        if broadcaster.broadcaster_login == streamer.trim() {
+        if broadcaster.broadcaster_login == config.streamer() {
             broadcaster_id = broadcaster.id;
             break;
         }
@@ -94,8 +137,11 @@ pub async fn get_ids() -> Result<(String, String), Box<dyn std::error::Error>> {
             "https://api.twitch.tv/helix/channel_points/custom_rewards?broadcaster_id={}",
             broadcaster_id,
         ))
-        .header("Authorization", format!("Bearer {}", token.trim()))
-        .header("Client-Id", client_id.trim())
+        .header(
+            "Authorization",
+            format!("Bearer {}", config.user_access_token()),
+        )
+        .header("Client-Id", config.client_id())
         .send()
         .await?
         .json()
@@ -103,7 +149,7 @@ pub async fn get_ids() -> Result<(String, String), Box<dyn std::error::Error>> {
 
     let mut reward_id = String::new();
     for reward in res.data {
-        if reward.title == reward_title.trim() {
+        if reward.title == config.reward_title() {
             reward_id = reward.id;
             break;
         }
@@ -162,13 +208,12 @@ struct SubscriptionData {
 }
 
 pub async fn create_subscription(
+    config: &Config,
     session_id: String,
     broadcaster_id: String,
     reward_id: String,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let client = reqwest::Client::new();
-    let token = read_to_string("./uat.txt").expect("needs to have uat.txt present");
-    let client_id = read_to_string("./client_id.txt").expect("needs to have client_id.txt present");
     let request_body = RequestBody {
         r#type: "channel.channel_points_custom_reward_redemption.add".into(),
         version: "1".into(),
@@ -184,8 +229,11 @@ pub async fn create_subscription(
 
     let _ = client
         .post("https://api.twitch.tv/helix/eventsub/subscriptions")
-        .header("Authorization", format!("Bearer {}", token.trim()))
-        .header("Client-Id", client_id.trim())
+        .header(
+            "Authorization",
+            format!("Bearer {}", config.user_access_token()),
+        )
+        .header("Client-Id", config.client_id())
         .header("Content-Type", "application/json")
         .json(&request_body)
         .send()
@@ -235,19 +283,14 @@ struct Cooldown {
     global: i32,
 }
 
-pub async fn update_command() -> Result<(), Box<dyn std::error::Error>> {
-    let token = read_to_string("./jwt.txt").expect("jwt.txt needed");
-    let streamer =
-        read_to_string("./other_streamer.txt").expect("needs to have other_streamer.txt present");
-    let command_name =
-        read_to_string("./command_name.txt").expect("needs to have command_name.txt present");
+pub async fn update_command(config: &Config) -> Result<(), Box<dyn std::error::Error>> {
     let url_base = "https://api.streamelements.com/kappa/v2/";
     let client = reqwest::Client::new();
     let res = client
         .get(url_base.to_string() + "users/access")
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
-        .header("Authorization", format!("Bearer {}", token.trim()))
+        .header("Authorization", format!("Bearer {}", config.jwt()))
         .send()
         .await?
         .json::<Vec<AccessResponse>>()
@@ -255,7 +298,7 @@ pub async fn update_command() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut channel_id = String::new();
     for res in res {
-        if res.username == streamer.trim() {
+        if res.username == config.streamer() {
             channel_id = res.channelId;
             break;
         }
@@ -269,7 +312,7 @@ pub async fn update_command() -> Result<(), Box<dyn std::error::Error>> {
         .get(url_base.to_string() + &format!("bot/commands/{}", channel_id))
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
-        .header("Authorization", format!("Bearer {}", token.trim()))
+        .header("Authorization", format!("Bearer {}", config.jwt()))
         .send()
         .await?
         .json::<Vec<CommandResponse>>()
@@ -277,7 +320,7 @@ pub async fn update_command() -> Result<(), Box<dyn std::error::Error>> {
 
     let mut command = CommandResponse::default();
     for res in res {
-        if res.command == command_name.trim() {
+        if res.command == config.command_name() {
             command = res;
             break;
         }
@@ -293,7 +336,7 @@ pub async fn update_command() -> Result<(), Box<dyn std::error::Error>> {
         .put(url_base.to_string() + &format!("bot/commands/{}/{}", channel_id, command._id))
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
-        .header("Authorization", format!("Bearer {}", token.trim()))
+        .header("Authorization", format!("Bearer {}", config.jwt()))
         .json(&command)
         .send()
         .await?
@@ -315,7 +358,7 @@ pub async fn update_command() -> Result<(), Box<dyn std::error::Error>> {
         .put(url_base.to_string() + &format!("bot/commands/{}/{}", channel_id, command._id))
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
-        .header("Authorization", format!("Bearer {}", token.trim()))
+        .header("Authorization", format!("Bearer {}", config.jwt()))
         .json(&command)
         .send()
         .await?
