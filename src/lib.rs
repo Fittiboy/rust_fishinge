@@ -101,7 +101,7 @@ struct RewardData {
     is_in_stock: bool,
     default_image: Map<String, Value>,
     should_redemptions_skip_request_queue: bool,
-    redemptions_redeemed_current_stream: Option<String>,
+    redemptions_redeemed_current_stream: Option<Number>,
     cooldown_expires_at: Option<String>,
 }
 
