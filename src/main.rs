@@ -7,7 +7,7 @@ use fishinge::{create_subscription, get_ids, Config};
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let config: Config = Config::load();
+    let config: Config = Config::load()?;
     let (tx, rx) = mpsc::channel();
     let (fish_tx, fish_rx) = async_channel::unbounded();
     let mut session = get_session(None)?;
@@ -22,8 +22,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let thread_config = config.clone();
     tokio::spawn(async move {
         loop {
-            fish_rx.recv().await.unwrap();
-            handle_notification(&thread_config).await.unwrap();
+            if (fish_rx.recv().await).is_ok() {
+                let _ = handle_notification(&thread_config).await;
+            }
         }
     });
 

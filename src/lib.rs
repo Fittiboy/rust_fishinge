@@ -16,13 +16,12 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load() -> Config {
-        let mut config_file = dirs::config_dir().expect("there should always be a config dir");
+    pub fn load() -> Result<Config, Box<dyn std::error::Error>> {
+        let mut config_file = dirs::config_dir().ok_or("cannot find user config dir")?;
         config_file.push("fishinge");
         config_file.push("fishinge.conf");
-        let config_data = read_to_string(config_file).unwrap();
-        let config: Config = toml::from_str(&config_data).unwrap();
-        config
+        let config_data = read_to_string(config_file)?;
+        Ok(toml::from_str(&config_data)?)
     }
 
     pub fn client_id(&self) -> &str {
