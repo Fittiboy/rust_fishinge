@@ -48,8 +48,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 async fn handle_notification(config: &Config) -> Result<(), Box<dyn std::error::Error>> {
-    fishinge::update_command(config).await?;
-    Ok(())
+    fishinge::update_command(config).await
 }
 
 async fn subscribe(session_id: String, config: &Config) -> Result<(), Box<dyn std::error::Error>> {
@@ -58,6 +57,5 @@ async fn subscribe(session_id: String, config: &Config) -> Result<(), Box<dyn st
         "Got ids:\n\tBroadcaster: {},\n\tReward: {}",
         broadcaster_id, reward_id
     );
-    create_subscription(config, session_id, broadcaster_id, reward_id).await?;
-    Ok(())
+    create_subscription(config, session_id, broadcaster_id, reward_id).await
 }
