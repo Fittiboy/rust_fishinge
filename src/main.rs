@@ -20,14 +20,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         });
 
     let thread_config = config.clone();
-    let _ = {
-        tokio::spawn(async move {
-            loop {
-                fish_rx.recv().await.unwrap();
-                handle_notification(&thread_config).await.unwrap();
-            }
-        })
-    };
+    tokio::spawn(async move {
+        loop {
+            fish_rx.recv().await.unwrap();
+            handle_notification(&thread_config).await.unwrap();
+        }
+    });
 
     loop {
         let mut welcome_count = 0;

@@ -129,7 +129,7 @@ pub async fn get_ids(config: &Config) -> Result<(String, String), Box<dyn std::e
             break;
         }
     }
-    if broadcaster_id.len() == 0 {
+    if broadcaster_id.is_empty() {
         return Err("oh no, no id found".into());
     }
     let res: RewardResponse = client
@@ -155,7 +155,7 @@ pub async fn get_ids(config: &Config) -> Result<(String, String), Box<dyn std::e
         }
     }
 
-    if reward_id.len() == 0 {
+    if reward_id.is_empty() {
         return Err("reward not found".into());
     };
 
@@ -227,7 +227,7 @@ pub async fn create_subscription(
         },
     };
 
-    let _ = client
+    client
         .post("https://api.twitch.tv/helix/eventsub/subscriptions")
         .header(
             "Authorization",
@@ -304,7 +304,7 @@ pub async fn update_command(config: &Config) -> Result<(), Box<dyn std::error::E
         }
     }
 
-    if channel_id.len() == 0 {
+    if channel_id.is_empty() {
         return Err("channel_id not found".into());
     };
 
@@ -326,7 +326,7 @@ pub async fn update_command(config: &Config) -> Result<(), Box<dyn std::error::E
         }
     }
 
-    if command.command.len() == 0 {
+    if command.command.is_empty() {
         return Err("command not found".into());
     }
 
@@ -343,7 +343,7 @@ pub async fn update_command(config: &Config) -> Result<(), Box<dyn std::error::E
         .json::<CommandResponse>()
         .await?;
 
-    if command.command.len() == 0 {
+    if command.command.is_empty() {
         return Err("command not enabled correctly".into());
     }
 
@@ -365,7 +365,7 @@ pub async fn update_command(config: &Config) -> Result<(), Box<dyn std::error::E
         .json::<CommandResponse>()
         .await?;
 
-    if command.command.len() == 0 {
+    if command.command.is_empty() {
         return Err("command not disabled correctly".into());
     }
 
