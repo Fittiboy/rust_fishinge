@@ -1,3 +1,4 @@
+use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Number, Value};
 use std::collections::HashMap;
@@ -16,11 +17,12 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn load() -> Result<Config, Box<dyn std::error::Error>> {
-        let mut config_file = dirs::config_dir().ok_or("cannot find user config dir")?;
+    pub fn load() -> Result<Config> {
+        let mut config_file = dirs::config_dir().ok_or(anyhow!("could not find config dir"))?;
         config_file.push("fishinge");
         config_file.push("fishinge.conf");
-        let config_data = read_to_string(config_file)?;
+        let config_data = read_to_string(&config_file)
+            .with_context(|| format!("Failed to read config file from {:?}", &config_file))?;
         Ok(toml::from_str(&config_data)?)
     }
 
@@ -104,7 +106,7 @@ struct RewardData {
     cooldown_expires_at: Option<String>,
 }
 
-pub async fn get_ids(config: &Config) -> Result<(String, String), Box<dyn std::error::Error>> {
+pub async fn get_ids(config: &Config) -> Result<(String, String)> {
     let client = reqwest::Client::new();
     let res: BroadcasterResponse = client
         .get(format!(
@@ -129,7 +131,7 @@ pub async fn get_ids(config: &Config) -> Result<(String, String), Box<dyn std::e
         }
     }
     if broadcaster_id.is_empty() {
-        return Err("oh no, no id found".into());
+        return Err(anyhow!("oh no, no id found"));
     }
     let res: RewardResponse = client
         .get(format!(
@@ -155,7 +157,7 @@ pub async fn get_ids(config: &Config) -> Result<(String, String), Box<dyn std::e
     }
 
     if reward_id.is_empty() {
-        return Err("reward not found".into());
+        return Err(anyhow!("reward not found"));
     };
 
     Ok((broadcaster_id, reward_id))
@@ -211,7 +213,7 @@ pub async fn create_subscription(
     session_id: String,
     broadcaster_id: String,
     reward_id: String,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<()> {
     let client = reqwest::Client::new();
     let request_body = RequestBody {
         r#type: "channel.channel_points_custom_reward_redemption.add".into(),
@@ -282,7 +284,7 @@ struct Cooldown {
     global: i32,
 }
 
-pub async fn update_command(config: &Config) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn update_command(config: &Config) -> Result<()> {
     let url_base = "https://api.streamelements.com/kappa/v2/";
     let client = reqwest::Client::new();
     let res = client
@@ -304,7 +306,7 @@ pub async fn update_command(config: &Config) -> Result<(), Box<dyn std::error::E
     }
 
     if channel_id.is_empty() {
-        return Err("channel_id not found".into());
+        return Err(anyhow!("channel_id not found"));
     };
 
     let res = client
@@ -326,7 +328,7 @@ pub async fn update_command(config: &Config) -> Result<(), Box<dyn std::error::E
     }
 
     if command.command.is_empty() {
-        return Err("command not found".into());
+        return Err(anyhow!("command not found"));
     }
 
     command.enabledOnline = true;
@@ -343,7 +345,7 @@ pub async fn update_command(config: &Config) -> Result<(), Box<dyn std::error::E
         .await?;
 
     if command.command.is_empty() {
-        return Err("command not enabled correctly".into());
+        return Err(anyhow!("command not enabled correctly"));
     }
 
     println!("Enabled command!");
@@ -365,7 +367,7 @@ pub async fn update_command(config: &Config) -> Result<(), Box<dyn std::error::E
         .await?;
 
     if command.command.is_empty() {
-        return Err("command not disabled correctly".into());
+        return Err(anyhow!("command not disabled correctly"));
     }
 
     println!("Disabled command!");

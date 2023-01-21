@@ -14,3 +14,4 @@ eventsub_websocket = { path = "../eventsub_websocket" }
 async-channel = "1.8.0"
 toml = "0.5.10"
 dirs = "4.0.0"
+anyhow = "1.0.68"

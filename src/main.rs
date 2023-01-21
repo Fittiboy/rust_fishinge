@@ -1,3 +1,4 @@
+use anyhow::Result;
 use eventsub_websocket::types::TwitchMessage;
 use eventsub_websocket::{event_handler, get_session};
 use std::sync::mpsc;
@@ -6,7 +7,7 @@ use std::thread;
 use fishinge::{create_subscription, get_ids, Config};
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
+async fn main() -> Result<()> {
     let config: Config = Config::load()?;
     let (tx, rx) = mpsc::channel();
     let (fish_tx, fish_rx) = async_channel::unbounded();
@@ -14,7 +15,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let _ = thread::Builder::new()
         .name("handler".into())
-        .spawn(move || -> Result<(), String> {
+        .spawn(move || -> Result<()> {
             event_handler(&mut session, tx)?;
             Ok(())
         });
@@ -30,7 +31,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         let mut welcome_count = 0;
-        let msg: TwitchMessage = rx.recv().map_err(|err| format!("{}", err))?;
+        let msg: TwitchMessage = rx.recv()?;
         match msg {
             TwitchMessage::Notification(_) => fish_tx.send("Ping!").await?,
             TwitchMessage::Welcome(msg) => {
@@ -46,11 +47,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
-async fn handle_notification(config: &Config) -> Result<(), Box<dyn std::error::Error>> {
+async fn handle_notification(config: &Config) -> Result<()> {
     fishinge::update_command(config).await
 }
 
-async fn subscribe(session_id: String, config: &Config) -> Result<(), Box<dyn std::error::Error>> {
+async fn subscribe(session_id: String, config: &Config) -> Result<()> {
     let (broadcaster_id, reward_id) = get_ids(config).await?;
     println!(
         "Got ids:\n\tBroadcaster: {},\n\tReward: {}",
