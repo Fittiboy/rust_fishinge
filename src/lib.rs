@@ -23,7 +23,8 @@ impl Config {
         config_file.push("fishinge.conf");
         let config_data = read_to_string(&config_file)
             .with_context(|| format!("Failed to read config file from {:?}", &config_file))?;
-        Ok(toml::from_str(&config_data)?)
+        Ok(toml::from_str(&config_data)
+            .with_context(|| format!("Could not read config data from string: {}", &config_data))?)
     }
 
     pub fn client_id(&self) -> &str {
@@ -119,9 +120,17 @@ pub async fn get_ids(config: &Config) -> Result<(String, String)> {
         )
         .header("Client-Id", config.client_id())
         .send()
-        .await?
+        .await
+        .with_context(|| {
+            format!(
+                "Failed sending request to get broadcaster ID of {}",
+                config.streamer()
+            )
+        })?
+        .error_for_status()?
         .json::<BroadcasterResponse>()
-        .await?;
+        .await
+        .context("Failed to parse response for broadcaster ID request")?;
 
     let mut broadcaster_id: String = String::new();
     for broadcaster in res.data {
@@ -144,9 +153,16 @@ pub async fn get_ids(config: &Config) -> Result<(String, String)> {
         )
         .header("Client-Id", config.client_id())
         .send()
-        .await?
-        .json()
-        .await?;
+        .await
+        .with_context(|| {
+            format!(
+                "Failed sending request to get rewards of {}",
+                broadcaster_id,
+            )
+        })?
+        .json::<RewardResponse>()
+        .await
+        .context("Failed to parse response for rewards list request")?;
 
     let mut reward_id = String::new();
     for reward in res.data {
@@ -238,9 +254,16 @@ pub async fn create_subscription(
         .header("Content-Type", "application/json")
         .json(&request_body)
         .send()
-        .await?
+        .await
+        .with_context(|| {
+            format!(
+                "Failed sending request to create subscription, with body: {:#?}",
+                request_body,
+            )
+        })?
         .json::<SubscriptionResponse>()
-        .await?;
+        .await
+        .context("Failed to parse response for subscription request")?;
 
     Ok(())
 }
@@ -287,15 +310,17 @@ struct Cooldown {
 pub async fn update_command(config: &Config) -> Result<()> {
     let url_base = "https://api.streamelements.com/kappa/v2/";
     let client = reqwest::Client::new();
-    let res = client
+    let res: Vec<AccessResponse> = client
         .get(url_base.to_string() + "users/access")
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
         .header("Authorization", format!("Bearer {}", config.jwt()))
         .send()
-        .await?
+        .await
+        .context("Failed sending request to update list of users")?
         .json::<Vec<AccessResponse>>()
-        .await?;
+        .await
+        .context("Failed to parse response for user list request")?;
 
     let mut channel_id = String::new();
     for res in res {
@@ -309,15 +334,17 @@ pub async fn update_command(config: &Config) -> Result<()> {
         return Err(anyhow!("channel_id not found"));
     };
 
-    let res = client
+    let res: Vec<CommandResponse> = client
         .get(url_base.to_string() + &format!("bot/commands/{}", channel_id))
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
         .header("Authorization", format!("Bearer {}", config.jwt()))
         .send()
-        .await?
+        .await
+        .context("Failed sending request to get command list")?
         .json::<Vec<CommandResponse>>()
-        .await?;
+        .await
+        .context("Failed to parse response for command list request")?;
 
     let mut command = CommandResponse::default();
     for res in res {
@@ -328,7 +355,7 @@ pub async fn update_command(config: &Config) -> Result<()> {
     }
 
     if command.command.is_empty() {
-        return Err(anyhow!("command not found"));
+        return Err(anyhow!("command \"{}\" not found", config.command_name()));
     }
 
     command.enabledOnline = true;
@@ -340,9 +367,11 @@ pub async fn update_command(config: &Config) -> Result<()> {
         .header("Authorization", format!("Bearer {}", config.jwt()))
         .json(&command)
         .send()
-        .await?
+        .await
+        .context("Failed sending request to enable command")?
         .json::<CommandResponse>()
-        .await?;
+        .await
+        .context("Failed to parse response for command enabling request")?;
 
     if command.command.is_empty() {
         return Err(anyhow!("command not enabled correctly"));
@@ -362,9 +391,11 @@ pub async fn update_command(config: &Config) -> Result<()> {
         .header("Authorization", format!("Bearer {}", config.jwt()))
         .json(&command)
         .send()
-        .await?
+        .await
+        .context("Failed sending request to disable command")?
         .json::<CommandResponse>()
-        .await?;
+        .await
+        .context("Failed to parse response for command disabling request")?;
 
     if command.command.is_empty() {
         return Err(anyhow!("command not disabled correctly"));
