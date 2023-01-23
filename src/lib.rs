@@ -2,29 +2,68 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Number, Value};
 use std::collections::HashMap;
-use std::fs::read_to_string;
+use std::fs::{read_to_string, OpenOptions};
+use std::io::Write;
+use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
-    client_id: String,
-    streamer: String,
-    user_access_token: String,
-    reward_title: String,
-    jwt: String,
-    command_name: String,
+    pub client_id: String,
+    pub streamer: String,
+    pub user_access_token: String,
+    pub reward_title: String,
+    pub jwt: String,
+    pub command_name: String,
+}
+
+impl Default for Config {
+    fn default() -> Config {
+        Config {
+            client_id: "".to_owned(),
+            streamer: "chobo".to_owned(),
+            user_access_token: "".to_owned(),
+            reward_title: "5 Minute Fishing Trip".to_owned(),
+            jwt: "".to_owned(),
+            command_name: "fishinge".to_owned(),
+        }
+    }
 }
 
 impl Config {
-    pub fn load() -> Result<Config> {
-        let mut config_file = dirs::config_dir().ok_or(anyhow!("could not find config dir"))?;
+    fn get_filepath() -> Result<std::path::PathBuf> {
+        let mut config_file =
+            dirs::config_dir().ok_or_else(|| anyhow!("could not find config dir"))?;
         config_file.push("fishinge");
         config_file.push("fishinge.conf");
+        Ok(config_file)
+    }
+
+    pub fn load() -> Result<Config> {
+        let config_file = Config::get_filepath()?;
         let config_data = read_to_string(&config_file)
             .with_context(|| format!("Failed to read config file from {:?}", &config_file))?;
-        Ok(toml::from_str(&config_data)
-            .with_context(|| format!("Could not read config data from string: {}", &config_data))?)
+        toml::from_str(&config_data)
+            .with_context(|| format!("Could not read config data from string: {}", &config_data))
+    }
+
+    pub fn write(&self) -> Result<()> {
+        let config_file = Config::get_filepath()?;
+        let mut file_handle = OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(config_file)?;
+        file_handle.write_all(toml::to_string_pretty(&self)?.as_bytes())?;
+        file_handle.flush()?;
+        Ok(())
+    }
+
+    pub fn empty() -> Config {
+        Config {
+            ..Default::default()
+        }
     }
 
     pub fn client_id(&self) -> &str {
@@ -105,6 +144,14 @@ struct RewardData {
     should_redemptions_skip_request_queue: bool,
     redemptions_redeemed_current_stream: Option<Number>,
     cooldown_expires_at: Option<String>,
+}
+
+pub fn write_output(output: &Arc<Mutex<String>>, text: &str) -> Result<()> {
+    match output.lock() {
+        Ok(mut out) => out.push_str(&format!("{}\n", text)),
+        _ => return Err(anyhow!("could not acquire clean lock on output")),
+    }
+    Ok(())
 }
 
 pub async fn get_ids(config: &Config) -> Result<(String, String)> {
@@ -307,7 +354,7 @@ struct Cooldown {
     global: i32,
 }
 
-pub async fn update_command(config: &Config) -> Result<()> {
+pub async fn update_command(output: &Arc<Mutex<String>>, config: &Config) -> Result<()> {
     let url_base = "https://api.streamelements.com/kappa/v2/";
     let client = reqwest::Client::new();
     let res: Vec<AccessResponse> = client
@@ -377,8 +424,8 @@ pub async fn update_command(config: &Config) -> Result<()> {
         return Err(anyhow!("command not enabled correctly"));
     }
 
-    println!("Enabled command!");
-    println!("Waiting 5 minutes...");
+    write_output(output, "Enabled command!")?;
+    write_output(output, "Waiting 5 minutes...")?;
 
     sleep(Duration::from_secs(300));
 
@@ -401,6 +448,6 @@ pub async fn update_command(config: &Config) -> Result<()> {
         return Err(anyhow!("command not disabled correctly"));
     }
 
-    println!("Disabled command!");
+    write_output(output, "Disabled command!")?;
     Ok(())
 }
