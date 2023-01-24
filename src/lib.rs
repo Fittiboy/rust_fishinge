@@ -2,7 +2,7 @@ use anyhow::{anyhow, Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Number, Value};
 use std::collections::HashMap;
-use std::fs::{read_to_string, OpenOptions};
+use std::fs::{read_to_string, DirBuilder, OpenOptions};
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 use std::thread::sleep;
@@ -33,15 +33,15 @@ impl Default for Config {
 
 impl Config {
     fn get_filepath() -> Result<std::path::PathBuf> {
-        let mut config_file =
+        let mut config_dir =
             dirs::config_dir().ok_or_else(|| anyhow!("could not find config dir"))?;
-        config_file.push("fishinge");
-        config_file.push("fishinge.conf");
-        Ok(config_file)
+        config_dir.push("fishinge");
+        Ok(config_dir)
     }
 
     pub fn load() -> Result<Config> {
-        let config_file = Config::get_filepath()?;
+        let mut config_file = Config::get_filepath()?;
+        config_file.push("fishinge.conf");
         let config_data = read_to_string(&config_file)
             .with_context(|| format!("Failed to read config file from {:?}", &config_file))?;
         toml::from_str(&config_data)
@@ -49,7 +49,11 @@ impl Config {
     }
 
     pub fn write(&self) -> Result<()> {
-        let config_file = Config::get_filepath()?;
+        let mut config_file = Config::get_filepath()?;
+        DirBuilder::new()
+            .recursive(true)
+            .create(config_file.clone())?;
+        config_file.push("fishinge.conf");
         let mut file_handle = OpenOptions::new()
             .write(true)
             .truncate(true)
