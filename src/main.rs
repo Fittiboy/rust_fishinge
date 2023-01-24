@@ -76,12 +76,10 @@ async fn main() -> Result<()> {
         Err(_) => Config::empty(),
     };
 
-    let new_conf = config.clone();
-
     eframe::run_native(
         "Fishinge Setup",
         options_clone,
-        Box::new(|_cc| Box::new(FishingeSetup { config: new_conf })),
+        Box::new(|_cc| Box::new(FishingeSetup { config })),
     );
 
     let (tx, rx) = mpsc::channel();
@@ -100,11 +98,19 @@ async fn main() -> Result<()> {
     let output_write2 = Arc::clone(&output);
     let output_read = Arc::clone(&output);
 
-    let thread_config = config.clone();
+    let config = match Config::load() {
+        Ok(config) => config,
+        Err(_) => Config::empty(),
+    };
+
+    let config1 = config.clone();
+    let config2 = config.clone();
+    drop(config);
+
     tokio::spawn(async move {
         loop {
             if (fish_rx.recv().await).is_ok() {
-                let _ = handle_notification(&output_write2, &thread_config).await;
+                let _ = handle_notification(&output_write2, &config1).await;
             }
         }
     });
@@ -120,7 +126,7 @@ async fn main() -> Result<()> {
                     welcome_count += 1;
                     if welcome_count == 1 {
                         let session_id = msg.session_id().to_owned();
-                        subscribe(&output_write1, session_id, &config).await?;
+                        subscribe(&output_write1, session_id, &config2).await?;
                         write_output(&output_write1, "Subscribed!")?;
                     }
                 }
