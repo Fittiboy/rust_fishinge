@@ -156,7 +156,7 @@ fn main() -> Result<()> {
     });
 
     eframe::run_native(
-        "Fishinge Setup",
+        "Pond opener 3000™",
         options,
         Box::new(move |_cc| {
             Box::new(FishingeOutput {
