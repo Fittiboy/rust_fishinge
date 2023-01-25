@@ -153,9 +153,11 @@ fn main() -> Result<()> {
                         if let Err(err) = subscribe(&output_write1, session_id, &config2) {
                             break err;
                         }
-                        if let Err(err) = write_output(&output_write1, "Subscribed!") {
-                            break err;
-                        }
+                        write_output(&output_write1, "Subscribed!")
+                            .expect("should be able to write to window at this point");
+                    } else {
+                        write_output(&output_write1, "Reconnected to Twitch!")
+                            .expect("should be able to write to window at this point");
                     }
                 }
                 _ => {}
