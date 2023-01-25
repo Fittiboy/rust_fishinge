@@ -70,6 +70,34 @@ impl Config {
         }
     }
 
+    pub fn test(&self) -> Result<()> {
+        let url_base = "https://api.streamelements.com/kappa/v2/";
+        let client = reqwest::blocking::Client::new();
+        let res: Vec<AccessResponse> = client
+            .get(url_base.to_string() + "users/access")
+            .header("Content-Type", "application/json")
+            .header("Accept", "application/json")
+            .header("Authorization", format!("Bearer {}", self.jwt()))
+            .send()
+            .context("Failed sending request to update list of users")?
+            .json::<Vec<AccessResponse>>()
+            .context("Failed to parse response for user list request")?;
+
+        let mut channel_id = String::new();
+        for res in res {
+            if res.username == self.streamer() {
+                channel_id = res.channelId;
+                break;
+            }
+        }
+
+        if channel_id.is_empty() {
+            return Err(anyhow!("channel_id not found"));
+        }
+
+        Ok(())
+    }
+
     pub fn client_id(&self) -> &str {
         &self.client_id
     }

@@ -104,6 +104,17 @@ fn main() -> Result<()> {
     let config2 = config.clone();
 
     thread::spawn(move || -> Result<(), anyhow::Error> {
+        if let Err(err) = config.test() {
+            write_output(&output_write2, &err.to_string())
+                .expect("should be able to write to window at this point");
+            drop(fish_rx);
+            return Err(err);
+        }
+        if let Err(err) = fish_rx.recv() {
+            write_output(&output_write2, &err.to_string())
+                .expect("should be able to write to window at this point");
+            return Err(err.into());
+        }
         let err: anyhow::Error = loop {
             if let Err(err) = fish_rx.recv() {
                 break err.into();
@@ -118,8 +129,13 @@ fn main() -> Result<()> {
     });
 
     thread::spawn(move || -> Result<(), anyhow::Error> {
+        let mut welcome_count = 0;
+        if let Err(err) = fish_tx.send("Healthy!") {
+            write_output(&output_write1, &err.to_string())
+                .expect("should be able to write to window at this point");
+            return Err(err.into());
+        }
         let err: anyhow::Error = loop {
-            let mut welcome_count = 0;
             let msg: TwitchMessage = match rx.recv() {
                 Ok(msg) => msg,
                 Err(err) => break err.into(),
