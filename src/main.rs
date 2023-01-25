@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used, clippy::unwrap_used)]
+
 use anyhow::Result;
 use eventsub_websocket::types::TwitchMessage;
 use eventsub_websocket::{event_handler, get_session};
@@ -59,8 +61,7 @@ impl eframe::App for FishingeOutput {
     }
 }
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     let options = eframe::NativeOptions {
         initial_window_size: Some(egui::vec2(320., 320.)),
         resizable: true,
@@ -83,7 +84,7 @@ async fn main() -> Result<()> {
     );
 
     let (tx, rx) = mpsc::channel();
-    let (fish_tx, fish_rx) = async_channel::unbounded();
+    let (fish_tx, fish_rx) = mpsc::channel();
     let mut session = get_session(None)?;
 
     let _ = thread::Builder::new()
@@ -107,33 +108,51 @@ async fn main() -> Result<()> {
     let config2 = config.clone();
     drop(config);
 
-    tokio::spawn(async move {
-        loop {
-            if (fish_rx.recv().await).is_ok() {
-                let _ = handle_notification(&output_write2, &config1).await;
+    thread::spawn(move || -> Result<(), anyhow::Error> {
+        let err: anyhow::Error = loop {
+            if let Err(err) = fish_rx.recv() {
+                break err.into();
             }
-        }
+            if let Err(err) = handle_notification(&output_write2, &config1) {
+                break err;
+            }
+        };
+        write_output(&output_write2, &err.to_string())
+            .expect("should be able to write to window at this point");
+        Err(err)
     });
 
-    #[allow(unreachable_code)]
-    tokio::spawn(async move {
-        loop {
+    thread::spawn(move || -> Result<(), anyhow::Error> {
+        let err: anyhow::Error = loop {
             let mut welcome_count = 0;
-            let msg: TwitchMessage = rx.recv()?;
+            let msg: TwitchMessage = match rx.recv() {
+                Ok(msg) => msg,
+                Err(err) => break err.into(),
+            };
             match msg {
-                TwitchMessage::Notification(_) => fish_tx.send("Ping!").await?,
+                TwitchMessage::Notification(_) => {
+                    if let Err(err) = fish_tx.send("Ping!") {
+                        break err.into();
+                    }
+                }
                 TwitchMessage::Welcome(msg) => {
                     welcome_count += 1;
                     if welcome_count == 1 {
                         let session_id = msg.session_id().to_owned();
-                        subscribe(&output_write1, session_id, &config2).await?;
-                        write_output(&output_write1, "Subscribed!")?;
+                        if let Err(err) = subscribe(&output_write1, session_id, &config2) {
+                            break err;
+                        }
+                        if let Err(err) = write_output(&output_write1, "Subscribed!") {
+                            break err;
+                        }
                     }
                 }
                 _ => {}
             }
-        }
-        Ok::<(), anyhow::Error>(())
+        };
+        write_output(&output_write1, &err.to_string())
+            .expect("should be able to write to window at this point");
+        Err(err)
     });
 
     eframe::run_native(
@@ -145,15 +164,16 @@ async fn main() -> Result<()> {
             })
         }),
     );
+
     Ok(())
 }
 
-async fn handle_notification(output: &Arc<Mutex<String>>, config: &Config) -> Result<()> {
-    fishinge::update_command(output, config).await
+fn handle_notification(output: &Arc<Mutex<String>>, config: &Config) -> Result<()> {
+    fishinge::update_command(output, config)
 }
 
-async fn subscribe(output: &Arc<Mutex<String>>, session_id: String, config: &Config) -> Result<()> {
-    let (broadcaster_id, reward_id) = get_ids(config).await?;
+fn subscribe(output: &Arc<Mutex<String>>, session_id: String, config: &Config) -> Result<()> {
+    let (broadcaster_id, reward_id) = get_ids(config)?;
     write_output(
         output,
         &format!(
@@ -161,5 +181,5 @@ async fn subscribe(output: &Arc<Mutex<String>>, session_id: String, config: &Con
             broadcaster_id, reward_id
         ),
     )?;
-    create_subscription(config, session_id, broadcaster_id, reward_id).await
+    create_subscription(config, session_id, broadcaster_id, reward_id)
 }

@@ -158,8 +158,8 @@ pub fn write_output(output: &Arc<Mutex<String>>, text: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn get_ids(config: &Config) -> Result<(String, String)> {
-    let client = reqwest::Client::new();
+pub fn get_ids(config: &Config) -> Result<(String, String)> {
+    let client = reqwest::blocking::Client::new();
     let res: BroadcasterResponse = client
         .get(format!(
             "https://api.twitch.tv/helix/search/channels?query={}",
@@ -171,7 +171,6 @@ pub async fn get_ids(config: &Config) -> Result<(String, String)> {
         )
         .header("Client-Id", config.client_id())
         .send()
-        .await
         .with_context(|| {
             format!(
                 "Failed sending request to get broadcaster ID of {}",
@@ -180,7 +179,6 @@ pub async fn get_ids(config: &Config) -> Result<(String, String)> {
         })?
         .error_for_status()?
         .json::<BroadcasterResponse>()
-        .await
         .context("Failed to parse response for broadcaster ID request")?;
 
     let mut broadcaster_id: String = String::new();
@@ -204,7 +202,6 @@ pub async fn get_ids(config: &Config) -> Result<(String, String)> {
         )
         .header("Client-Id", config.client_id())
         .send()
-        .await
         .with_context(|| {
             format!(
                 "Failed sending request to get rewards of {}",
@@ -212,7 +209,6 @@ pub async fn get_ids(config: &Config) -> Result<(String, String)> {
             )
         })?
         .json::<RewardResponse>()
-        .await
         .context("Failed to parse response for rewards list request")?;
 
     let mut reward_id = String::new();
@@ -275,13 +271,13 @@ struct SubscriptionData {
     cost: Number,
 }
 
-pub async fn create_subscription(
+pub fn create_subscription(
     config: &Config,
     session_id: String,
     broadcaster_id: String,
     reward_id: String,
 ) -> Result<()> {
-    let client = reqwest::Client::new();
+    let client = reqwest::blocking::Client::new();
     let request_body = RequestBody {
         r#type: "channel.channel_points_custom_reward_redemption.add".into(),
         version: "1".into(),
@@ -305,7 +301,6 @@ pub async fn create_subscription(
         .header("Content-Type", "application/json")
         .json(&request_body)
         .send()
-        .await
         .with_context(|| {
             format!(
                 "Failed sending request to create subscription, with body: {:#?}",
@@ -313,7 +308,6 @@ pub async fn create_subscription(
             )
         })?
         .json::<SubscriptionResponse>()
-        .await
         .context("Failed to parse response for subscription request")?;
 
     Ok(())
@@ -358,19 +352,17 @@ struct Cooldown {
     global: i32,
 }
 
-pub async fn update_command(output: &Arc<Mutex<String>>, config: &Config) -> Result<()> {
+pub fn update_command(output: &Arc<Mutex<String>>, config: &Config) -> Result<()> {
     let url_base = "https://api.streamelements.com/kappa/v2/";
-    let client = reqwest::Client::new();
+    let client = reqwest::blocking::Client::new();
     let res: Vec<AccessResponse> = client
         .get(url_base.to_string() + "users/access")
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
         .header("Authorization", format!("Bearer {}", config.jwt()))
         .send()
-        .await
         .context("Failed sending request to update list of users")?
         .json::<Vec<AccessResponse>>()
-        .await
         .context("Failed to parse response for user list request")?;
 
     let mut channel_id = String::new();
@@ -391,10 +383,8 @@ pub async fn update_command(output: &Arc<Mutex<String>>, config: &Config) -> Res
         .header("Accept", "application/json")
         .header("Authorization", format!("Bearer {}", config.jwt()))
         .send()
-        .await
         .context("Failed sending request to get command list")?
         .json::<Vec<CommandResponse>>()
-        .await
         .context("Failed to parse response for command list request")?;
 
     let mut command = CommandResponse::default();
@@ -418,10 +408,8 @@ pub async fn update_command(output: &Arc<Mutex<String>>, config: &Config) -> Res
         .header("Authorization", format!("Bearer {}", config.jwt()))
         .json(&command)
         .send()
-        .await
         .context("Failed sending request to enable command")?
         .json::<CommandResponse>()
-        .await
         .context("Failed to parse response for command enabling request")?;
 
     if command.command.is_empty() {
@@ -442,10 +430,8 @@ pub async fn update_command(output: &Arc<Mutex<String>>, config: &Config) -> Res
         .header("Authorization", format!("Bearer {}", config.jwt()))
         .json(&command)
         .send()
-        .await
         .context("Failed sending request to disable command")?
         .json::<CommandResponse>()
-        .await
         .context("Failed to parse response for command disabling request")?;
 
     if command.command.is_empty() {
