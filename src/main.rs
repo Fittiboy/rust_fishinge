@@ -85,11 +85,11 @@ fn main() -> Result<()> {
 
     let (tx, rx) = mpsc::channel();
     let (fish_tx, fish_rx) = mpsc::channel();
-    let mut session = get_session(None)?;
 
     let _ = thread::Builder::new()
         .name("handler".into())
         .spawn(move || -> Result<()> {
+            let mut session = get_session(None)?;
             event_handler(&mut session, tx)?;
             Ok(())
         });
@@ -99,21 +99,16 @@ fn main() -> Result<()> {
     let output_write2 = Arc::clone(&output);
     let output_read = Arc::clone(&output);
 
-    let config = match Config::load() {
-        Ok(config) => config,
-        Err(_) => Config::empty(),
-    };
-
-    let config1 = config.clone();
+    let config = Config::load()
+        .expect("config has to exist at this point, unless some system operation failed");
     let config2 = config.clone();
-    drop(config);
 
     thread::spawn(move || -> Result<(), anyhow::Error> {
         let err: anyhow::Error = loop {
             if let Err(err) = fish_rx.recv() {
                 break err.into();
             }
-            if let Err(err) = handle_notification(&output_write2, &config1) {
+            if let Err(err) = handle_notification(&output_write2, &config) {
                 break err;
             }
         };
