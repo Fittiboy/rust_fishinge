@@ -1,8 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use anyhow::Result;
+use eventsub_websocket::event_handler;
 use eventsub_websocket::types::TwitchMessage;
-use eventsub_websocket::{event_handler, get_session};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
@@ -96,15 +96,7 @@ fn main() -> Result<()> {
         thread::Builder::new()
             .name("handler".into())
             .spawn(move || -> Result<()> {
-                let mut session = match get_session(None) {
-                    Ok(session) => session,
-                    Err(err) => {
-                        write_output(&output_write1, &err.to_string())
-                            .expect("should be able to write to window at this point");
-                        return Err(err.into());
-                    }
-                };
-                if let Err(err) = event_handler(&mut session, tx) {
+                if let Err(err) = event_handler(None, tx) {
                     write_output(&output_write1, &err.to_string())
                         .expect("should be able to write to window at this point")
                 }
