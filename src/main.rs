@@ -1,8 +1,8 @@
 #![allow(clippy::expect_used, clippy::unwrap_used)]
 
 use anyhow::Result;
-use eventsub_websocket::event_handler;
 use eventsub_websocket::types::TwitchMessage;
+use eventsub_websocket::{event_handler, CloseCode, CloseFrame};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
@@ -92,16 +92,14 @@ fn main() -> Result<()> {
     let output_write3 = Arc::clone(&output);
     let output_read = Arc::clone(&output);
 
-    let handler_handle =
-        thread::Builder::new()
-            .name("handler".into())
-            .spawn(move || -> Result<()> {
-                if let Err(err) = event_handler(None, tx) {
-                    write_output(&output_write1, &err.to_string())
-                        .expect("should be able to write to window at this point")
-                }
-                Ok(())
-            });
+    let event_res = match event_handler(None, tx.clone()) {
+        Ok(event_res) => event_res,
+        Err(err) => {
+            write_output(&output_write1, &err.to_string())
+                .expect("should be able to write to window at this point");
+            return Err(err.into());
+        }
+    };
 
     let config = Config::load()
         .expect("config has to exist at this point, unless some system operation failed");
@@ -186,7 +184,14 @@ fn main() -> Result<()> {
         }),
     );
 
-    handler_handle?;
+    event_res
+        .socket
+        .lock()
+        .expect("socket should not be poisoned")
+        .close(Some(CloseFrame {
+            code: CloseCode::Normal,
+            reason: "Client encountered error.".into(),
+        }))?;
     notification_handle?;
     listener_handle?;
     Ok(())
