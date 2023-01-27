@@ -185,6 +185,9 @@ fn main() -> Result<()> {
     );
 
     event_res
+        .session
+        .lock()
+        .expect("session should not be poisoned")
         .socket
         .lock()
         .expect("socket should not be poisoned")
