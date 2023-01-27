@@ -164,7 +164,7 @@ fn main() -> Result<()> {
                     TwitchMessage::Welcome(msg) => {
                         welcome_count += 1;
                         if welcome_count == 1 {
-                            let session_id = msg.session_id().to_owned();
+                            let session_id = msg.payload.session.id.to_owned();
                             if let Err(err) = subscribe(&output_write3, session_id, &config2) {
                                 break err;
                             }
