@@ -133,7 +133,7 @@ fn main() -> Result<()> {
                                 subscribe(&output_write3, session_id, &config2),
                                 output_write3,
                             );
-                            write_expect!(&output_write3, "Subscribed!");
+                            write_expect!(&output_write3, "Subscribed to redemption notifications!\nWaiting for redmeptions...");
                         }
                     }
                     _ => {}
@@ -175,7 +175,7 @@ fn subscribe(output: &Arc<Mutex<String>>, session_id: String, config: &Config) -
     write_expect!(
         output,
         &format!(
-            "Got ids:\n\tBroadcaster: {},\n\tReward: {}",
+            "Found all required ids:\n Broadcaster:\n  {}\n Reward:\n  {}",
             broadcaster_id, reward_id
         )
     );
