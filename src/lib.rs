@@ -8,6 +8,9 @@ use std::sync::{Arc, Mutex};
 use std::thread::sleep;
 use std::time::Duration;
 
+#[macro_use]
+pub mod macros;
+
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct Config {
     pub client_id: String,
