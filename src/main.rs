@@ -105,7 +105,7 @@ fn main() -> Result<()> {
             if_err_writer!(fish_rx.recv(), output_write2,);
             loop {
                 if_err_writer!(fish_rx.recv(), output_write2,);
-                if_err_writer!(handle_notification(&output_write2, &config), output_write2,);
+                handle_notification(&output_write2, &config);
             }
         },
     );
@@ -166,8 +166,13 @@ fn main() -> Result<()> {
     Ok(())
 }
 
-fn handle_notification(output: &Arc<Mutex<String>>, config: &Config) -> Result<()> {
-    fishinge::update_command(output, config)
+fn handle_notification(output: &Arc<Mutex<String>>, config: &Config) {
+    if let Err(err) = fishinge::update_command(output, config) {
+        write_expect!(
+            output,
+            &format!("Error updating command: {}\nAttempting to continue...", err)
+        );
+    }
 }
 
 fn subscribe(output: &Arc<Mutex<String>>, session_id: String, config: &Config) -> Result<()> {
