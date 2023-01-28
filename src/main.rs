@@ -4,7 +4,7 @@ use anyhow::Result;
 use eventsub_websocket::types::TwitchMessage;
 use eventsub_websocket::{event_handler, CloseCode, CloseFrame};
 use std::sync::{mpsc, Arc, Mutex};
-use std::thread;
+use std::thread::{self, JoinHandle};
 
 use fishinge::{create_subscription, get_ids, is_subscribed, write_output, Config};
 use fishinge::{if_err_writer, let_match_writer, write_expect};
@@ -28,17 +28,20 @@ impl eframe::App for FishingeSetup {
             ui.text_edit_singleline(&mut self.config.jwt);
             ui.heading("Command Name");
             ui.text_edit_singleline(&mut self.config.command_name);
-            if ui.button("Launch").clicked() {
-                let config = &self.config;
-                config.write().unwrap();
-                frame.close();
-            }
+            ui.with_layout(egui::Layout::left_to_right(egui::Align::BOTTOM), |ui| {
+                if ui.button("Launch").clicked() {
+                    let config = &self.config;
+                    config.write().unwrap();
+                    frame.close();
+                }
+            });
         });
     }
 }
 
 struct FishingeOutput {
     output: Arc<Mutex<String>>,
+    handle: Option<JoinHandle<Result<(), anyhow::Error>>>,
 }
 
 impl eframe::App for FishingeOutput {
@@ -57,6 +60,20 @@ impl eframe::App for FishingeOutput {
                     std::process::exit(0);
                 }
             });
+            if self.handle.is_some() {
+                let handle = self.handle.take().unwrap();
+                if handle.is_finished() {
+                    write_expect!(self.output, "Listen handler closed!\n  CANNOT CONTINUE!");
+                    match handle.join().unwrap() {
+                        Ok(_) => write_expect!(self.output, "Handler closed correctly"),
+                        Err(err) => {
+                            write_expect!(self.output, &format!("Handler failed: {:?}", err))
+                        }
+                    }
+                } else {
+                    let _ = self.handle.insert(handle);
+                }
+            }
             Ok(())
         });
     }
@@ -64,7 +81,7 @@ impl eframe::App for FishingeOutput {
 
 fn main() -> Result<()> {
     let options = eframe::NativeOptions {
-        initial_window_size: Some(egui::vec2(320., 320.)),
+        initial_window_size: Some(egui::vec2(340., 380.)),
         resizable: true,
         fullscreen: false,
         maximized: false,
@@ -108,13 +125,20 @@ fn main() -> Result<()> {
                 handle_notification(&output_write2, &config);
             }
         },
-    );
+    )?;
 
     let listener_handle = thread::Builder::new().name("listener".into()).spawn(
         move || -> Result<(), anyhow::Error> {
             let mut welcome_count = 0;
             if_err_writer!(fish_tx.send("Healthy!"), output_write3,);
             loop {
+                if notification_handle.is_finished() {
+                    write_expect!(&output_write3, "Notification handler closed!");
+                    match notification_handle.join() {
+                        Ok(ok) => return Ok(ok?),
+                        Err(err) => return Err(anyhow::anyhow!("notification handler died: {:#?}", err)),
+                    }
+                }
                 let_match_writer!(msg, rx.recv(), output_write3);
                 match msg {
                     TwitchMessage::Notification(_) => {
@@ -140,7 +164,7 @@ fn main() -> Result<()> {
                 }
             }
         },
-    );
+    )?;
 
     eframe::run_native(
         "Pond opener 3000™",
@@ -148,6 +172,7 @@ fn main() -> Result<()> {
         Box::new(move |_cc| {
             Box::new(FishingeOutput {
                 output: output_read,
+                handle: Some(listener_handle),
             })
         }),
     );
@@ -161,8 +186,6 @@ fn main() -> Result<()> {
             code: CloseCode::Normal,
             reason: "Client encountered error.".into(),
         }))?;
-    notification_handle?;
-    listener_handle?;
     Ok(())
 }
 
