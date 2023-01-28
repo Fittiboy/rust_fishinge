@@ -278,6 +278,8 @@ struct RewardCondition {
 struct Transport {
     method: String,
     session_id: String,
+    connected_at: Option<String>,
+    disconnected_at: Option<String>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -302,6 +304,48 @@ struct SubscriptionData {
     cost: Number,
 }
 
+#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+struct SubscriptionsListResponse {
+    data: Vec<SubscriptionData>,
+    total: Option<u8>,
+    total_cost: Option<u8>,
+    pagination: Pagination,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+struct Pagination {
+    cursor: Option<String>,
+}
+
+pub fn is_subscribed(config: &Config, session_id: String) -> Result<bool> {
+    let mut subbed = false;
+    let response = reqwest::blocking::Client::new()
+        .get("https://api.twitch.tv/helix/eventsub/subscriptions")
+        .header(
+            "Authorization",
+            format!("Bearer {}", config.user_access_token()),
+        )
+        .header("Client-Id", config.client_id())
+        .send()
+        .context("Failed sending request to get subscriptions")
+        .unwrap()
+        .json::<SubscriptionsListResponse>()
+        .context("Failed to parse response for subscriptions list request")
+        .unwrap();
+
+    for subscription in response.data.iter() {
+        if subscription.status == "enabled".to_owned() {
+            if subscription.transport.session_id == session_id.to_owned() {
+                subbed = true;
+            }
+        }
+    }
+
+    Ok(subbed)
+}
+
 pub fn create_subscription(
     config: &Config,
     session_id: String,
@@ -319,6 +363,8 @@ pub fn create_subscription(
         transport: Transport {
             method: "websocket".into(),
             session_id,
+            connected_at: None,
+            disconnected_at: None,
         },
     };
 

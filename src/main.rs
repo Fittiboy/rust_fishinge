@@ -6,7 +6,7 @@ use eventsub_websocket::{event_handler, CloseCode, CloseFrame};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread;
 
-use fishinge::{create_subscription, get_ids, write_output, Config};
+use fishinge::{create_subscription, get_ids, is_subscribed, write_output, Config};
 use fishinge::{if_err_writer, let_match_writer, write_expect};
 
 struct FishingeSetup {
@@ -123,14 +123,17 @@ fn main() -> Result<()> {
                     TwitchMessage::Welcome(msg) => {
                         welcome_count += 1;
                         if welcome_count == 1 {
-                            let session_id = msg.payload.session.id.to_owned();
+                            write_expect!(&output_write3, "Connected to Twitch!");
+                        } else {
+                            write_expect!(&output_write3, "Reconnected to Twitch!");
+                        }
+                        let session_id = msg.payload.session.id.to_owned();
+                        if !is_subscribed(&config2, session_id.clone())? {
                             if_err_writer!(
                                 subscribe(&output_write3, session_id, &config2),
                                 output_write3,
                             );
                             write_expect!(&output_write3, "Subscribed!");
-                        } else {
-                            write_expect!(&output_write3, "Reconnected to Twitch!");
                         }
                     }
                     _ => {}
