@@ -189,8 +189,6 @@ fn main() -> Result<()> {
         .lock()
         .expect("session should not be poisoned")
         .socket
-        .lock()
-        .expect("socket should not be poisoned")
         .close(Some(CloseFrame {
             code: CloseCode::Normal,
             reason: "Client encountered error.".into(),
