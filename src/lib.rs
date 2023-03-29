@@ -329,11 +329,9 @@ pub fn is_subscribed(config: &Config, session_id: String) -> Result<bool> {
         )
         .header("Client-Id", config.client_id())
         .send()
-        .context("Failed sending request to get subscriptions")
-        .unwrap()
+        .context("Failed sending request to get subscriptions")?
         .json::<SubscriptionsListResponse>()
-        .context("Failed to parse response for subscriptions list request")
-        .unwrap();
+        .context("Failed to parse response for subscriptions list request")?;
 
     for subscription in response.data.iter() {
         if subscription.status == "enabled".to_owned() {
