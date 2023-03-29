@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use eventsub_websocket::types::TwitchMessage;
-use eventsub_websocket::{event_handler, CloseCode, CloseFrame};
+use eventsub_websocket::{event_handler, get_default_url, CloseCode, CloseFrame};
 use std::sync::{mpsc, Arc, Mutex};
 use std::thread::{self, JoinHandle};
 
@@ -110,7 +110,8 @@ fn main() -> Result<()> {
     let output_write3 = Arc::clone(&output);
     let output_read = Arc::clone(&output);
 
-    let_match_writer!(event_res, event_handler(None, tx.clone()), output_write1);
+    let url = get_default_url()?;
+    let_match_writer!(event_res, event_handler(url, tx.clone()), output_write1);
 
     let config = Config::load()
         .expect("config has to exist at this point, unless some system operation failed");
