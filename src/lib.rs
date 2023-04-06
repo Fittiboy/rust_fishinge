@@ -214,7 +214,7 @@ pub fn get_ids(config: &Config) -> Result<(String, String)> {
 
     let mut broadcaster_id: String = String::new();
     for broadcaster in res.data {
-        if broadcaster.broadcaster_login == config.streamer() {
+        if broadcaster.broadcaster_login == config.streamer().to_lowercase() {
             broadcaster_id = broadcaster.id;
             break;
         }
@@ -442,7 +442,7 @@ pub fn update_command(output: &Arc<Mutex<String>>, config: &Config) -> Result<()
 
     let mut channel_id = String::new();
     for res in res {
-        if res.username == config.streamer() {
+        if res.username == config.streamer().to_lowercase() {
             channel_id = res.channelId;
             break;
         }
